@@ -15,12 +15,12 @@ module.exports = {
 
     async execute(interaction) {
         try {
-            // 🖼️ Cole aqui o link da imagem grande (Banner SSP)
-            const urlBannerBaixo = 'https://i.imgur.com/8Q8aN8K.png';
+            // Link direto do banner do Discord (corrigido)
+            const urlBannerBaixo = 'https://media.discordapp.net/attachments/1341433401349247037/1529590645868593193/image.png?ex=6a627dcc&is=6a612c4c&hm=31713e600836a120c28600c0ab25a0fd6d4a09911105a7bddd2a437b683db680&=&format=webp&quality=lossless&width=1860&height=620';
 
             // 1. Criando a Embed do Painel
             const embed = new EmbedBuilder()
-                .setTitle('FORÇA TÁTICA — PAINEL DE SOLICITAÇÃO FUNCIONAL')
+                .setTitle('CAEP — PAINEL DE SOLICITAÇÃO FUNCIONAL')
                 .setColor('#FF0000') // Linha lateral vermelha
                 .setDescription(
                     'Este painel destina-se exclusivamente ao processamento de solicitações de identificação funcional.\n\n' +

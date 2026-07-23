@@ -24,8 +24,8 @@ module.exports = {
         .setDescription('Inicia a avaliação de estágio operacional.'),
 
     async execute(interaction) {
-        // 1. Comando /avaliar-estagio -> Abre menu
-        if (interaction.isChatInputCommand()) {
+        // 1. Comando /avaliar-estagio ou Clique no Botão do Painel -> Abre menu
+        if (interaction.isChatInputCommand() || (interaction.isButton() && interaction.customId === 'btn_iniciar_avaliacao')) {
             const selectMenu = new UserSelectMenuBuilder()
                 .setCustomId('selecionar_policial')
                 .setPlaceholder('Selecione o policial a ser avaliado...')
@@ -43,10 +43,8 @@ module.exports = {
 
         // 2. Seleção de membro no menu -> Abre Formulário Modal
         if (interaction.isUserSelectMenu() && interaction.customId === 'selecionar_policial') {
-            const targetUserId = interaction.values[0];
-
             const modal = new ModalBuilder()
-                .setCustomId(`modal_avaliacao_${targetUserId}`)
+                .setCustomId(`modal_avaliacao_${interaction.values[0]}`)
                 .setTitle('Avaliação de Estágio Operacional');
 
             const inputAvaliador = new TextInputBuilder()
@@ -100,8 +98,11 @@ module.exports = {
 
         // 3. Envio do Formulário -> Cálculo de média e postagem no canal
         if (interaction.isModalSubmit() && interaction.customId.startsWith('modal_avaliacao_')) {
+            // Adia a resposta imediatamente para evitar o estouro dos 3 segundos do Discord
+            await interaction.deferReply({ ephemeral: true });
+
             const targetUserId = interaction.customId.split('_')[2];
-            const targetUser = await interaction.client.users.fetch(targetUserId);
+            const targetUser = await interaction.client.users.fetch(targetUserId).catch(() => null);
 
             const avaliadorInfo = interaction.fields.getTextInputValue('avaliador_info');
             const notaComportamento = parseFloat(interaction.fields.getTextInputValue('nota_comportamento').replace(',', '.')) || 0;
@@ -114,9 +115,8 @@ module.exports = {
                 isNaN(notaConduta) || notaConduta < 0 || notaConduta > 10 ||
                 isNaN(notaOperacional) || notaOperacional < 0 || notaOperacional > 10
             ) {
-                return interaction.reply({
-                    content: '❌ **Erro:** As notas devem ser números válidos entre 1 e 10.',
-                    ephemeral: true
+                return await interaction.editReply({
+                    content: '❌ **Erro:** As notas devem ser números válidos entre 1 e 10.'
                 });
             }
 
@@ -135,10 +135,10 @@ module.exports = {
             const horaFormatada = agora.toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' });
 
             const embed = new EmbedBuilder()
-                .setTitle('═══════════════════════════════\n        AVALIAÇÃO DE ESTÁGIO\n═══════════════════════════════')
+                .setTitle('═══════════════════════════════\n       AVALIAÇÃO DE ESTÁGIO\n═══════════════════════════════')
                 .setColor(corEmbed)
                 .addFields(
-                    { name: '👤 POLICIAL AVALIADO', value: `<@${targetUserId}>\n*${targetUser.username}*`, inline: false },
+                    { name: '👤 POLICIAL AVALIADO', value: `<@${targetUserId}>\n*${targetUser ? targetUser.username : 'Desconhecido'}*`, inline: false },
                     { name: '👮 POLICIAL AVALIADOR', value: avaliadorInfo, inline: false },
                     { name: '────────────────────', value: '\u200B', inline: false },
                     { name: '📌 Comportamento Policial', value: gerarBarraProgresso(notaComportamento), inline: false },
@@ -156,20 +156,23 @@ module.exports = {
                 .setTimestamp()
                 .setFooter({ text: 'CAEP — Centro de Aperfeiçoamento e Ensino Policial' });
 
-            const canalDestino = await interaction.guild.channels.fetch(process.env.CANAL_AVALIACOES_ID).catch(() => null);
+            const canalDestinoId = process.env.CANAL_AVALIACOES_ID;
+            let canalDestino = interaction.guild.channels.cache.get(canalDestinoId);
+
+            if (!canalDestino && canalDestinoId) {
+                canalDestino = await interaction.guild.channels.fetch(canalDestinoId).catch(() => null);
+            }
 
             if (!canalDestino) {
-                return interaction.reply({
-                    content: '❌ **Erro:** Não foi possível encontrar o canal de avaliações. Verifique o ID no arquivo .env.',
-                    ephemeral: true
+                return await interaction.editReply({
+                    content: '❌ **Erro:** Não foi possível encontrar o canal de avaliações. Verifique o ID no arquivo .env.'
                 });
             }
 
             await canalDestino.send({ embeds: [embed] });
 
-            return await interaction.reply({ 
-                content: `✅ Avaliação **${idRegistro}** enviada com sucesso para o canal <#${process.env.CANAL_AVALIACOES_ID}>!`, 
-                ephemeral: true 
+            return await interaction.editReply({ 
+                content: `✅ Avaliação **${idRegistro}** enviada com sucesso para o canal <#${canalDestinoId}>!` 
             });
         }
     }
